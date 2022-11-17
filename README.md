@@ -1,0 +1,1 @@
+# Сервер сапёра для https://github.com/Stepashka20/Minesweeper-GO
