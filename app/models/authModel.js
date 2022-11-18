@@ -15,7 +15,7 @@ const findLoginUser = async (req,email, password) => {
 }
 const createUser = async (req, username,email,password) => {
     const users = req.mongo.collection('users');
-    const token = req.jwt.sign({ username: username })
+    const token = await req.jwt.sign({ username: username }, {expiresIn: "7d"})
     const user = await users.insertOne({
         username: username,
         email: email,

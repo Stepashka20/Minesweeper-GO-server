@@ -12,7 +12,16 @@ const start = async () => {
         const app = Fastify({
             logger:false,
         });
-        //cors for localhost
+        app.register(require('@fastify/multipart'), {
+            limits: {
+                fieldNameSize: 100, // Max field name size in bytes
+                fieldSize: 100,     // Max field value size in bytes
+                fields: 10,         // Max number of non-file fields
+                fileSize: 1*1024*1024 ,  // 1MB in bytes
+                files: 1,           // Max number of file fields
+                headerPairs: 50   // Max number of header key=>value pairs
+            }
+        });
         app.register(cors, {
             origin: 'http://localhost:3000',
             methods: ['GET', 'POST', 'PUT', 'DELETE'],
@@ -30,6 +39,7 @@ const start = async () => {
             dir: path.join(__dirname,'./app/routes'),
             ignorePattern: /schemas$/
         })
+
         app.decorate("authenticate", async function(request, reply) {
             try {
                 await request.jwtVerify()
@@ -43,7 +53,7 @@ const start = async () => {
             req.jwt = app.jwt;
             next()
         }) 
-        app.listen({ port: 9287 },()=>{
+        app.listen({ port: process.env.SERVER_PORT },()=>{
             console.log(app.printRoutes());
         })
     } catch (err) {
@@ -52,24 +62,3 @@ const start = async () => {
     }
 }
 start()
-
-
-// const Fastify = require('fastify')
-// const fastify = Fastify({ logger: true })
-
-// fastify.register((instance, opts, next) => {
-
-//   instance.get('/', (req, res) => { res.send(req.raw.method) })
-//   instance.post('/', (req, res) => { res.send(req.raw.method) })
-//   instance.put('/', (req, res) => { res.send(req.raw.method) })
-//   instance.patch('/', (req, res) => { res.send(req.raw.method) })
-
-//   instance.get('/other', (req, res) => { res.send('other code') })
-
-//   next()
-// }, { prefix: 'user' })
-
-
-// fastify.listen(3000, () => {
-//   console.log(fastify.printRoutes());
-// })

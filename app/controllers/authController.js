@@ -3,6 +3,19 @@ const authModel = require('../models/authModel');
 
 const authUser = async (req, res) => {
 
+    const decodedToken = req.jwt.decode(req.headers.authorization.split(' ')[1]);
+    const user = await authModel.findUser(req,"username",decodedToken.username) 
+    if (!user)
+        return await res.status(400).send({message: 'Пользователь не найден'});
+    return await res.status(200).send({
+        username: user.username,
+        email: user.email,
+        avatar: user.avatar,
+        balance: user.balance,
+        rating: user.rating,
+        shop: user.shop,
+        items: user.items
+    });
 }
 
 const loginUser = async (req, res) => {

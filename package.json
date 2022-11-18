@@ -5,6 +5,7 @@
     "@fastify/helmet": "^10.0.2",
     "@fastify/jwt": "^6.3.3",
     "@fastify/mongodb": "^6.1.0",
+    "@fastify/multipart": "^7.3.0",
     "dotenv": "^16.0.3",
     "fastify": "^4.9.2",
     "pino-pretty": "^9.1.1",
