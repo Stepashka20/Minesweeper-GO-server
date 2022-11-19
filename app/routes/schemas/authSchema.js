@@ -23,15 +23,15 @@ const registerSchema = {
 const loginSchema = {
     body: {
         type: 'object',
-        required: ['password', 'email'],
+        required: ['password', 'login'],
         properties: {
             password: {
                 type: 'string',
                 minLength: 8,
             },
-            email: {
+            login: {
                 type: 'string',
-                minLength: 4,
+                minLength: 3,
             }
         }
     }

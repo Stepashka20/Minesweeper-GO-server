@@ -6,11 +6,14 @@ const findUser = async (req,field, value) => {
     const user = await users.findOne({[field]:value});
     return user;
 }
-const findLoginUser = async (req,email, password) => {
+const findLoginUser = async (req,username, password) => {
     const users = req.mongo.collection('users');
-    const user = await users.findOne({email:email,password:sha256(password+process.env.PASSWORD_SALT)})
+    var user = await users.findOne({username:username,password:sha256(password+process.env.PASSWORD_SALT)})
     if (!user) 
         return null;
+    const token = await req.jwt.sign({ username: username }, {expiresIn: "7d"})
+    await users.updateOne({username:username},{$set:{token:token}})
+    user.token = token;
     return user;
 }
 const createUser = async (req, username,email,password) => {
@@ -24,9 +27,32 @@ const createUser = async (req, username,email,password) => {
         rating: 0,
         avatar: "",
         shop: {
-            avatarBorder: 0,
-            avatarColor: 0,
+            avatarBorder: "",
+            usernameColor: "",
         },
+        statistics: {
+            bestTime: {
+                easy: 0,
+                medium: 0,
+                hard: 0
+            },
+            games: {
+                easy: 0,
+                medium: 0,
+                hard: 0
+            },
+            wins: {
+                easy: 0,
+                medium: 0,
+                hard: 0
+            },
+            loses: {
+                easy: 0,
+                medium: 0,
+                hard: 0
+            },
+        },
+        gameHistory: [],
         items:[],
         token: token
     });

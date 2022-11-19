@@ -20,7 +20,7 @@ const authUser = async (req, res) => {
 
 const loginUser = async (req, res) => {
     const userData = req.body;
-    const user = await authModel.findLoginUser(req,userData.email,userData.password);
+    const user = await authModel.findLoginUser(req,userData.login,userData.password);
     if (!user) 
         return await res.status(400).send({message: 'Неверный логин или пароль'});
     return await res.status(200).send({
