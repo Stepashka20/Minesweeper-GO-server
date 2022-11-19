@@ -45,7 +45,7 @@ const returnToUser = async (req,user) => {
             items: user.items,
             token: user.token,
             statistics: user.statistics,
-            //return last 15 games
+            activeItems: user.activeItems,
             gameHistory: user.gameHistory.slice(user.gameHistory.length-15 < 0 ? 0 : user.gameHistory.length ,user.gameHistory.length)
         },
         top: top
@@ -65,6 +65,10 @@ const createUser = async (req, username,email,password) => {
         shop: {
             avatarBorder: "",
             usernameColor: "",
+        },
+        activeItems:{
+            avatar: 0,
+            username: 0,
         },
         statistics: {
             bestTime: {

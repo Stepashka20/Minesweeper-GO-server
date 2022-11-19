@@ -54,7 +54,7 @@ const start = async () => {
             next()
         }) 
         app.listen({ port: process.env.SERVER_PORT },()=>{
-            console.log(app.printRoutes());
+            // console.log(app.printRoutes());
         })
     } catch (err) {
         console.log(err)
