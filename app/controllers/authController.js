@@ -7,15 +7,7 @@ const authUser = async (req, res) => {
     const user = await authModel.findUser(req,"username",decodedToken.username) 
     if (!user)
         return await res.status(400).send({message: 'Пользователь не найден'});
-    return await res.status(200).send({
-        username: user.username,
-        email: user.email,
-        avatar: user.avatar,
-        balance: user.balance,
-        rating: user.rating,
-        shop: user.shop,
-        items: user.items
-    });
+     return await res.status(200).send(await authModel.returnToUser(req,user));
 }
 
 const loginUser = async (req, res) => {
@@ -23,15 +15,7 @@ const loginUser = async (req, res) => {
     const user = await authModel.findLoginUser(req,userData.login,userData.password);
     if (!user) 
         return await res.status(400).send({message: 'Неверный логин или пароль'});
-    return await res.status(200).send({
-        username: user.username,
-        avatar: user.avatar,
-        balance: user.balance,
-        rating: user.rating,
-        token: user.token,
-        shop: user.shop,
-        items: user.items
-    });
+    return await res.status(200).send(await authModel.returnToUser(req,user));
 }
 
 const registerUser =async (req, res) => {
@@ -41,15 +25,7 @@ const registerUser =async (req, res) => {
         return await res.status(400).send({message: 'Пользователь уже существует'});
     } 
     const user = await authModel.createUser(req,userData.username,userData.email,userData.password);
-    return await res.status(200).send({
-        username: user.username,
-        avatar: user.avatar,
-        balance: user.balance,
-        rating: user.rating,
-        token: user.token,
-        shop: user.shop,
-        items: user.items
-    });
+    return await res.status(200).send(await authModel.returnToUser(req,user));
 }
 
 

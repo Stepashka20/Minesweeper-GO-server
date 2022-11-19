@@ -6,6 +6,8 @@ const getAvatar = async (req, res) => {
     if (!file) {
         return res.status(404).send({message: 'Файл не найден'});
     }
+
+    res.header('Cache-Control', 'public, max-age=3600');
     res.type(filetype)
     res.send(file);
 }

@@ -10,8 +10,8 @@ const saveAvatarToDisk = async (req,data) => {
         fs.unlinkSync(path.join(__dirname,`../../images_cdn/${user.avatar}`));
 
     fs.writeFileSync(path.join(__dirname,`../../images_cdn/${user.username}.${extension}`), buffer);
-    users.updateOne({username:decodedToken.username},{$set:{avatar:`${user.username}.${extension}`}});
-
+    await users.updateOne({username:decodedToken.username},{$set:{avatar:`${user.username}.${extension}`}});
+    return `${user.username}.${extension}`;
 }
 
 

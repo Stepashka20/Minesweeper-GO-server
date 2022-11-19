@@ -1,6 +1,21 @@
 const sha256 = require('sha256');
 require('dotenv').config();
 
+const getTop = async (req) => {
+    const users = req.mongo.collection('users');
+    var top = await users.find({},{projection:{username:1,rating:1,avatar:1,shop:1,statistics:1}}).sort({rating:-1}).limit(10).toArray();
+    top = top.map((user,index) => {
+        return {
+            username: user.username,
+            rating: user.rating,
+            avatar: user.avatar,
+            shop: user.shop,
+            wins: user.statistics.wins.easy + user.statistics.wins.medium + user.statistics.wins.hard,
+            losses: user.statistics.losses.easy + user.statistics.losses.medium + user.statistics.losses.hard
+        }
+    })
+    return top;
+}
 const findUser = async (req,field, value) => {
     const users = req.mongo.collection('users');
     const user = await users.findOne({[field]:value});
@@ -15,6 +30,27 @@ const findLoginUser = async (req,username, password) => {
     await users.updateOne({username:username},{$set:{token:token}})
     user.token = token;
     return user;
+}
+
+const returnToUser = async (req,user) => {
+    console.log(user)
+    const top = await getTop(req);
+    return {
+        user:{
+            username: user.username,
+            avatar: user.avatar,
+            balance: user.balance,
+            rating: user.rating,
+            shop: user.shop,
+            items: user.items,
+            token: user.token,
+            statistics: user.statistics,
+            //return last 15 games
+            gameHistory: user.gameHistory.slice(user.gameHistory.length-15 < 0 ? 0 : user.gameHistory.length ,user.gameHistory.length)
+        },
+        top: top
+       
+    }
 }
 const createUser = async (req, username,email,password) => {
     const users = req.mongo.collection('users');
@@ -46,7 +82,7 @@ const createUser = async (req, username,email,password) => {
                 medium: 0,
                 hard: 0
             },
-            loses: {
+            losses: {
                 easy: 0,
                 medium: 0,
                 hard: 0
@@ -59,8 +95,10 @@ const createUser = async (req, username,email,password) => {
 
     return await findUser(req,"_id",user.insertedId);
 }
+
 module.exports = {
     findUser,
     createUser,
-    findLoginUser
+    findLoginUser,
+    returnToUser
 }

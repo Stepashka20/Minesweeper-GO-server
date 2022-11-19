@@ -8,8 +8,8 @@ const uploadAvatar = async (req, res) => {
         return res.status(400).send({message: 'Неверный формат файла'});
     } 
     console.log(data)
-    await avatarModel.saveAvatarToDisk(req,data);
-    res.send({message: 'Аватар успешно загружен'});
+    const url = await avatarModel.saveAvatarToDisk(req,data);
+    res.send({message: 'Аватар успешно загружен',url});
     
 }
 
