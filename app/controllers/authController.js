@@ -20,7 +20,6 @@ const loginUser = async (req, res) => {
 
 const registerUser =async (req, res) => {
     const userData = req.body;
-    console.log(userData)
     if (await authModel.findUser(req,"username",userData.username) || await authModel.findUser(req,"email",userData.email)) {
         return await res.status(400).send({message: 'Пользователь уже существует'});
     } 

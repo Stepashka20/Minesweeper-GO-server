@@ -11,14 +11,16 @@ const getItems = async (req, res) => {
 //TODO REMOVE AVATAR AND RENAME TO AVATAR BORDER!!!!!!!! 
 const buyItem = async (req, res) => {
     const id = +req.params['*']
-    console.log(id)
     const item = await shopModel.getItem(req,id);
     if (!item) {
         return await res.status(404).send({message: 'Товар не найден'});
     }
     const result = await shopModel.buyItem(req,item);
-    console.log(result)
-    return await res.status(result.status).send({message: result.message, balance: result.user.balance, items: result.user.items});
+    if (result.status == 200) {
+        return await res.status(result.status).send({message: result.message, balance: result.user.balance, items: result.user.items});
+    } else {
+        return await res.status(result.status).send({message: result.message});
+    }
 
 }
 
@@ -29,7 +31,11 @@ const activateItem = async (req, res) => {
         return await res.status(404).send({message: 'Товар не найден'});
     }
     const result = await shopModel.activateItem(req,item);
-    return await res.status(result.status).send({message: result.message, activeItems: result.user.activeItems,shop: result.user.shop});
+    if (result.status == 200) {
+        return await res.status(result.status).send({message: result.message, activeItems: result.user.activeItems,shop: result.user.shop});
+    } else {
+        return await res.status(result.status).send({message: result.message});
+    }
 }
 
 const deactivateItem = async (req, res) => {
@@ -39,7 +45,11 @@ const deactivateItem = async (req, res) => {
         return await res.status(404).send({message: 'Товар не найден'});
     }
     const result = await shopModel.deactivateItem(req,item);
-    return await res.status(result.status).send({message: result.message, activeItems: result.user.activeItems,shop: result.user.shop});
+    if (result.status == 200) {
+        return await res.status(result.status).send({message: result.message, activeItems: result.user.activeItems,shop: result.user.shop});
+    } else {
+        return await res.status(result.status).send({message: result.message});
+    }
 }
 module.exports = {
     getItems,

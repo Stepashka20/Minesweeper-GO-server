@@ -33,7 +33,6 @@ const findLoginUser = async (req,username, password) => {
 }
 
 const returnToUser = async (req,user) => {
-    console.log(user)
     const top = await getTop(req);
     return {
         user:{

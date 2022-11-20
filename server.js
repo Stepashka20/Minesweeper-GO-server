@@ -40,19 +40,27 @@ const start = async () => {
             ignorePattern: /schemas$/
         })
 
-        app.decorate("authenticate", async function(request, reply) {
-            try {
-                await request.jwtVerify()
-            } catch (err) {
-                reply.send(err)
-            }
-        })
+
         app.addHook('onRequest', (req, res, next) => {
-            console.log(`[${new Date().toLocaleTimeString()}] ${req.method} ${JSON.stringify(req.query)??""} ${JSON.stringify(req.params)??""}`);
+            const url_path = req.raw.url;
+            console.log(`[${new Date().toLocaleTimeString()}] ${req.method} ${url_path} ${JSON.stringify(req.query)??""} ${JSON.stringify(req.params)??""}`);
             req.mongo = app.mongo.client.db('minesweeper_go');
             req.jwt = app.jwt;
             next()
         }) 
+        app.decorate("authenticate", async function(request, reply) {
+            try {
+                await request.jwtVerify()
+                const users = request.mongo.collection('users');
+                const user = await users.findOne({token:request.headers.authorization.split(' ')[1]})
+                if (!user) {
+                    reply.code(401).send({message: "Unauthorized"})
+                    return;  
+                }
+            } catch (err) {
+                reply.send(err)
+            }
+        })
         app.listen({ port: process.env.SERVER_PORT },()=>{
             // console.log(app.printRoutes());
         })
