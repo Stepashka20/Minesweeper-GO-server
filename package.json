@@ -8,6 +8,7 @@
     "@fastify/multipart": "^7.3.0",
     "dotenv": "^16.0.3",
     "fastify": "^4.9.2",
+    "fastify-graceful-shutdown": "^3.4.0",
     "pino-pretty": "^9.1.1",
     "sha256": "^0.2.0"
   }

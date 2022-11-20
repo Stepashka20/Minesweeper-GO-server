@@ -1,7 +1,6 @@
 const avatarModel = require('../models/avatarModel');
 
 const uploadAvatar = async (req, res) => {
-    // const decodedToken = req.jwt.decode(req.headers.authorization.split(' ')[1]);
     const data = await req.file()
     if (!data || !data?.file || !data?.mimetype?.startsWith('image') || !(["png","jpg","jpeg"].includes(data.mimetype.replace('image/','')))) {
         return res.status(400).send({message: 'Неверный формат файла'});

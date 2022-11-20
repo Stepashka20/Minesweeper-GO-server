@@ -4,10 +4,11 @@ const path = require('path');
 //TODO delete repeated code
 const getAvatarFile = async (req) => {
     const filename = req.params['*'];
-
+    console.log(filename);
     if (!fs.existsSync(path.join(__dirname,`../../images_cdn/avatars/${filename}`)) || !filename || filename.includes("/") || filename.includes("..") || filename.includes("\\")) {
         return [null,null];
     }
+    console.log(1)
     return [fs.readFileSync(path.join(__dirname,`../../images_cdn/avatars/${filename}`)),filename.split('.')[1]]
 }
 

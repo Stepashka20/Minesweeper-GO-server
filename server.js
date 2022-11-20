@@ -3,7 +3,7 @@ const cors = require('@fastify/cors');
 const helmet = require('@fastify/helmet');
 const autoload = require('@fastify/autoload');
 const path = require('path');
-const fs = require('fs')
+const fastify_graceful_shutdown = require('fastify-graceful-shutdown')
 require('dotenv').config();
 
 
@@ -11,6 +11,7 @@ const start = async () => {
     try {
         const app = Fastify({
             logger:false,
+            forceCloseConnections: true,
         });
         app.register(require('@fastify/multipart'), {
             limits: {
@@ -39,15 +40,7 @@ const start = async () => {
             dir: path.join(__dirname,'./app/routes'),
             ignorePattern: /schemas$/
         })
-
-
-        app.addHook('onRequest', (req, res, next) => {
-            const url_path = req.raw.url;
-            console.log(`[${new Date().toLocaleTimeString()}] ${req.method} ${url_path} ${JSON.stringify(req.query)??""} ${JSON.stringify(req.params)??""}`);
-            req.mongo = app.mongo.client.db('minesweeper_go');
-            req.jwt = app.jwt;
-            next()
-        }) 
+        app.register(fastify_graceful_shutdown)
         app.decorate("authenticate", async function(request, reply) {
             try {
                 await request.jwtVerify()
@@ -60,6 +53,22 @@ const start = async () => {
             } catch (err) {
                 reply.send(err)
             }
+        })
+        app.addHook('onRequest', (req, res, next) => {
+            const url_path = req.raw.url;
+            console.log(`[${new Date().toLocaleTimeString()}] ${req.method} ${url_path} ${JSON.stringify(req.query)??""} ${JSON.stringify(req.params)??""}`);
+            req.mongo = app.mongo.client.db('minesweeper_go');
+            req.jwt = app.jwt;
+            next()
+        }) 
+        app.after(() => {
+            app.gracefulShutdown(async (signal, next) => {
+              console.log('Stopping server...')
+              await app.close()
+              await app.mongo.client.close()
+              await app.unref()
+              next()
+            })
         })
         app.listen({ port: process.env.SERVER_PORT },()=>{
             // console.log(app.printRoutes());
