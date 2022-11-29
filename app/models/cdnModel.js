@@ -13,7 +13,6 @@ const getImage = async (req, imageSpace) => {
     if (!fs.existsSync(path.join(__dirname,`../../images_cdn/${imageFolder}/${filename}`)) || !filename || filename.includes("/") || filename.includes("..") || filename.includes("\\")) {
         return [null,null];
     }
-    console.log(1)
     return [fs.readFileSync(path.join(__dirname,`../../images_cdn/${imageFolder}/${filename}`)),filename.split('.')[1]]
 }
 
