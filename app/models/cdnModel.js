@@ -6,10 +6,10 @@ const imageSpaceToFolder = {
     "shop": "shop"
 }
 
-const getImage = async (req, imageSpace) => {
+const getImage = async (req, imageType) => {
     const filename = req.params['*'];
     console.log(filename);
-    const imageFolder = imageSpaceToFolder[imageSpace]
+    const imageFolder = imageSpaceToFolder[imageType]
     if (!fs.existsSync(path.join(__dirname,`../../images_cdn/${imageFolder}/${filename}`)) || !filename || filename.includes("/") || filename.includes("..") || filename.includes("\\")) {
         return [null,null];
     }

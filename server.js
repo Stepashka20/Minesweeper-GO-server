@@ -24,11 +24,12 @@ const start = async () => {
             }
         });
         app.register(cors, {
-            origin: 'http://localhost:3000',
+            origin: '*',
             methods: ['GET', 'POST', 'PUT', 'DELETE'],
             allowedHeaders: ['*'],
             credentials: true,
         });
+        app.register(require('@fastify/websocket'))
         app.register(require('@fastify/mongodb'), {
             forceClose: true,
             url: process.env.MONGO_URL,
@@ -43,16 +44,21 @@ const start = async () => {
         app.register(fastify_graceful_shutdown)
         app.decorate("authenticate", async function(request, reply) {
             try {
+                if (request.query?.token) request.headers.authorization = `Bearer ${request.query.token}` //for websockets
                 await request.jwtVerify()
                 const users = request.mongo.collection('users');
-                const user = await users.findOne({token:request.headers.authorization.split(' ')[1]})
+                const user = await users.count({token:request.headers.authorization.split(' ')[1]}, {limit: 1});
                 if (!user) {
                     reply.code(401).send({message: "Unauthorized"})
                     return;  
                 }
             } catch (err) {
+                console.log(err)
                 reply.send(err)
             }
+        })
+        app.decorate("authenticateWS", async function(request, reply) {
+           
         })
         app.addHook('onRequest', (req, res, next) => {
             const url_path = req.raw.url;

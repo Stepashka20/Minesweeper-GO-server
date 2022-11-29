@@ -6,6 +6,7 @@
     "@fastify/jwt": "^6.3.3",
     "@fastify/mongodb": "^6.1.0",
     "@fastify/multipart": "^7.3.0",
+    "@fastify/websocket": "^7.1.1",
     "dotenv": "^16.0.3",
     "fastify": "^4.9.2",
     "fastify-graceful-shutdown": "^3.4.0",
