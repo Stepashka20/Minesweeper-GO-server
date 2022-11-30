@@ -19,10 +19,8 @@ const createGame = async (req,gameParams,field) => {
             username: user.username,
             avatar: user.avatar,
             rating: user.rating,
+            points: 0,
         }],
-        points: {
-            [user.username]: 0,
-        },
         timeBet: 120, //TODO calculate timeBet
         timeStart: Date.now(),
         status: 'waiting',
@@ -35,6 +33,20 @@ const createGame = async (req,gameParams,field) => {
     return userResp;
         
 
+}
+
+const getGame = async (req,uid) => {
+    const games = req.mongo.collection('games');
+    const game = await games.findOne({uid:uid});
+    // console.log(game)
+    // return null
+    const username = req.jwt.decode(req.headers.authorization.split(' ')[1]).username;
+    if (!game.players.map(p => p.username).includes(username)) {
+        return null
+    }
+    var userResp = game
+    delete userResp.field;
+    return userResp;
 }
 
 const generateField = (size,difficulty) => {
@@ -108,5 +120,6 @@ const randString = (length) => {
 
 module.exports = {
     generateField,
-    createGame
+    createGame,
+    getGame
 }

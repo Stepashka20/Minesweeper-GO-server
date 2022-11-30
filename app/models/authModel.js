@@ -45,6 +45,7 @@ const returnToUser = async (req,user) => {
             token: user.token,
             statistics: user.statistics,
             activeItems: user.activeItems,
+            game: user.game,
             gameHistory: user.gameHistory.slice(user.gameHistory.length-15 < 0 ? 0 : user.gameHistory.length ,user.gameHistory.length)
         },
         top: top

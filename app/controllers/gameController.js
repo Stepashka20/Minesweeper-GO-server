@@ -17,11 +17,19 @@ const startGame = async (req, res) => {
     }
 }
 
-
+const getGame = async (req, res) => {
+    const uid = req.params['*']
+    const game = await gameModel.getGame(req,uid);
+    if (!game) {
+        return res.status(404).send({message: "Игра не найдена"}); 
+    }
+    res.send(game);
+}
 
 
 
 module.exports = {
     getLobbies,
-    startGame
+    startGame,
+    getGame
 }

@@ -6,6 +6,15 @@ const init = async (connection , req) => {
     const { socket } = connection;
     const uid = req.query.uid;
     const games = req.mongo.collection('games');
+    const users = req.mongo.collection('users');
+
+    const username = req.jwt.decode(req.headers.authorization.split(' ')[1]).username;
+    const user = await users.findOne({username:username,game:uid});
+    if (!user) {
+        socket.send(JSON.stringify({type: 'error', message: 'Вы не в этой игре'}));
+        socket.close();
+        return;
+    }
     var game = await games.findOne({uid:uid});
     var userField = game.userField;
     console.log(game)
@@ -23,7 +32,7 @@ const init = async (connection , req) => {
                 break;
             } 
             case 'loadgame':{
-
+                socket.send(JSON.stringify({type: 'loadgame',game:game}));
             }
             case "open":{
                 const cellNum = data.data;
@@ -62,16 +71,32 @@ const init = async (connection , req) => {
                 if (x < size - 1 && y < size - 1) {
                     if (field[cellNum + size + 1] == -1) minesCount++;
                 }
+                game.players.find(player => player.username == username).points += minesCount;
                 userField[cellNum] = minesCount;
-                socket.send(JSON.stringify({type: 'open', data: {cellNum: cellNum, minesCount: minesCount,userField:userField}}))
+                socket.send(JSON.stringify({type: 'open', data: {cellNum: cellNum, minesCount: minesCount,userField:userField,points:game.players.find(player => player.username == username).points}}))
                 break;
+            }
+            case "flag":{
+                const cellNum = data.data;
+                
+                if (userField[cellNum] == -3) {
+                    userField[cellNum] = 0;
+                } else {
+                    userField[cellNum] = -3;
+                }
+                
+                socket.send(JSON.stringify({type: 'open', data: {cellNum: cellNum,userField:userField,points:game.players.find(player => player.username == username).points}}))
             }
         }
 
     })
 
     socket.on('close', () => {
-        console.log('disconnected')
+        console.log('closed')
+        //save full game
+
+        games.updateOne({uid:uid},{$set:{userField:userField,players:game.players}});
+
     })
 
    
