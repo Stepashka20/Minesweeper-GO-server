@@ -51,31 +51,30 @@ const getGame = async (req,uid) => {
 
 const generateField = (size,difficulty) => {
     let field = [];
-    let mines = 0;
     let minesCount = 0;
     let cellsCount = 0;
     switch (difficulty) {
         case "easy":
-            mines = Math.floor(size * size * 0.1);
+            minesCount = Math.floor(size * size * 0.1);
             break;
         case "medium":
-            mines = Math.floor(size * size * 0.15);
+            minesCount = Math.floor(size * size * 0.15);
             break;
         case "hard":
-            mines = Math.floor(size * size * 0.2);
+            minesCount = Math.floor(size * size * 0.2);
             break;
     }
     cellsCount = size * size;
-    minesCount = mines;
+    minesCount = minesCount;
     for (let i = 0; i < cellsCount; i++) {
         field.push(0);
     }
-    for (let i = 0; i < mines; i++) {
+    let placedMinesCount = 0;
+    while (placedMinesCount != minesCount) {
         let rnd = Math.floor(Math.random() * cellsCount);
         if (field[rnd] == 0) {
             field[rnd] = -1;
-        } else {
-            i--;
+            placedMinesCount++;
         }
     }
     for (let i = 0; i < cellsCount; i++) {
@@ -106,6 +105,50 @@ const generateField = (size,difficulty) => {
                 minesAround++;
             }
             field[i] = minesAround;
+        }
+    }
+    if (field[0] > 0) {
+        let count = 0;
+        if (field[1] == -1) count++;
+        if (field[size] == -1) count++;
+        if (field[size+1] == -1) count++;
+        if (count != field[0]) {
+            console.log("Error: fantom bomb at top left");
+            console.log(field);
+            field[0] = count;
+        }
+    }
+    if (field[size-1] > 0) {
+        let count = 0;
+        if (field[size-2] == -1) count++;
+        if (field[2*size-1] == -1) count++;
+        if (field[2*size-2] == -1) count++;
+        if (count != field[size-1]) {
+            console.log("Error: fantom bomb top right");
+            console.log(field);
+            field[size-1] = count;
+        }
+    }
+    if (field[cellsCount-size] > 0) {
+        let count = 0;
+        if (field[cellsCount-size+1] == -1) count++;
+        if (field[cellsCount-2*size] == -1) count++;
+        if (field[cellsCount-2*size+1] == -1) count++;
+        if (count != field[cellsCount-size]) {
+            console.log("Error: fantom bomb bottom left");
+            console.log(field);
+            field[cellsCount-size] = count;
+        }
+    }
+    if (field[cellsCount-1] > 0) {
+        let count = 0;
+        if (field[cellsCount-2] == -1) count++;
+        if (field[cellsCount-1-size] == -1) count++;
+        if (field[cellsCount-1-size-1] == -1) count++;
+        if (count != field[cellsCount-1]) {
+            console.log("Error: fantom bomb bottom right");
+            console.log(field);
+            field[cellsCount-1] = count;
         }
     }
     return field;
