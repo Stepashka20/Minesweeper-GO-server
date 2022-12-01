@@ -21,7 +21,7 @@ const createGame = async (req,gameParams,field) => {
             rating: user.rating,
             points: 0,
         }],
-        timeBet: 120, //TODO calculate timeBet
+        timeBet: 600, //TODO calculate timeBet
         timeStart: Date.now(),
         status: 'waiting',
         uid: randString(10)
