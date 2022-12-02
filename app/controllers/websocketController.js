@@ -114,11 +114,8 @@ const init = async (connection , req) => {
             }
             case "leave":{
                 users.updateOne({username:username},{$set:{game:null}});
-                // socket.close();
-                socket.send(JSON.stringify({type: 'leave'}))
-                setTimeout(() => {
-                    socket.close();
-                },5000)
+                await socket.send(JSON.stringify({type: 'leave'}))
+                socket.close();
                 break;
             }
         }
@@ -151,24 +148,34 @@ const init = async (connection , req) => {
             // }
 
             const gameTime = (Date.now() - game.timeStart)
+            console.log(`OLD TIME: ${ user.statistics.bestTime[game.difficulty]}`)
+            console.log(`NEW TIME: ${gameTime}`)
+            game.reward.stars = calcRating(game.difficulty,game.size,gameTime);
             if (gameTime<= game.timeBet*1000) {
                 
                 await users.updateOne({username:username},{
                     $inc:{
-                        balance:game.reward,
+                        balance:game.reward.bombs,
+                        rating:game.reward.stars,
                         // [`statistics.wins.${game.difficulty}`]:1,   //only for multiplayer
                         // [`statistics.games.${game.difficulty}`]:1,
-                        [`statistics.bestTime.${game.difficulty}`]: user.statistics.bestTime[game.difficulty] < gameTime ? user.statistics.bestTime[game.difficulty] : gameTime
+                    },
+                    $set:{
+                        [`statistics.bestTime.${game.difficulty}`]: user.statistics.bestTime[game.difficulty] > gameTime && user.statistics.bestTime[game.difficulty] > 0 ? gameTime : user.statistics.bestTime[game.difficulty] 
                     }
                 });
-                socket.send(JSON.stringify({type: 'win',data:{reward: true, sum: game.reward}}))
+                console.log({[`statistics.bestTime.${game.difficulty}`]: user.statistics.bestTime[game.difficulty] > gameTime && user.statistics.bestTime[game.difficulty] > 0 ? gameTime : user.statistics.bestTime[game.difficulty] })
+                socket.send(JSON.stringify({type: 'win',data:{reward: true, bombs: game.reward.bombs, stars: game.reward.stars}}))
             } else {
                 
                 await users.updateOne({username:username},{
                     $inc:{
                         // [`statistics.losses.${game.difficulty}`]:1,  //only for multiplayer
                         // [`statistics.games.${game.difficulty}`]:1,
-                        [`statistics.bestTime.${game.difficulty}`]: user.statistics.bestTime[game.difficulty] < gameTime ? user.statistics.bestTime[game.difficulty] : gameTime
+                        
+                    },
+                    $set:{
+                        [`statistics.bestTime.${game.difficulty}`]: user.statistics.bestTime[game.difficulty] > gameTime && user.statistics.bestTime[game.difficulty] > 0  ? gameTime : user.statistics.bestTime[game.difficulty]
                     }
                 });
                 socket.send(JSON.stringify({type: 'win',data:{reward: false}}))
@@ -220,6 +227,25 @@ const init = async (connection , req) => {
     }
 
    
+}
+
+
+const calcRating = (difficulty,size,time) => {
+    let rating = 0;
+    switch (difficulty) {
+        case "easy":
+            rating = 1;
+            break;
+        case "medium":
+            rating = 1.4;
+            break;
+        case "hard":
+            rating = 1.9;
+            break;
+    }
+    rating += size/10;
+    rating += 1/time*100;
+    return Math.ceil(rating);
 }
 
 module.exports = {
