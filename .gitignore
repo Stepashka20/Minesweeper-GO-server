@@ -2,3 +2,4 @@ node_modules
 .env
 images_cdn/avatars/*
 images_cdn/shop/*
+nodemon.json

@@ -1,194 +1,130 @@
 // const cdnModel = require('../models/cdnModel');
 
-
-
-const init = async (connection , req) => {
-    const { socket } = connection;
-    const uid = req.query.uid;
-    const games = req.mongo.collection('games');
-    const users = req.mongo.collection('users');
-
-    const username = req.jwt.decode(req.headers.authorization.split(' ')[1]).username;
-    const user = await users.findOne({username:username,game:uid});
-    if (!user) {
-        socket.send(JSON.stringify({type: 'error', message: 'Вы не в этой игре'}));
-        socket.close();
-        return;
+class NewConnection {
+    constructor(connection , req) {
+        return (async (connection , req) => {
+            this.socket = connection.socket
+            this.uid = req.query.uid;
+            this.games = req.mongo.collection('games');
+            this.users = req.mongo.collection('users');
+            this.username = req.jwt.decode(req.headers.authorization.split(' ')[1]).username;
+            this.game = await this.games.findOne({uid:this.uid});
+            this.user = await this.users.findOne({username:this.username,game: this.uid});
+            this.userField = this.game.userField;
+            if (!this.user || !this.game)
+                throw new Error("Игра не найдена")
+            
+            this.gameField = this.game.field;
+            this.gameEnd = false
+            this.socket.on('message', this.onMessage.bind(this))
+            this.socket.on('close', this.onClose.bind(this))
+            this.socket.on('error', this.onError.bind(this))
+            this.send = async (data) => this.socket.send(JSON.stringify(data))
+            return this;
+        })(connection , req);
     }
-    var game = await games.findOne({uid:uid});
-    var userField = game.userField;
-    var gameEnd = false;
-    console.log(game)
-    socket.on('message', async (message) => {
-        let data;
+
+    onMessage(message) {
         try {
-            data = JSON.parse(message);
-        } catch (e) {
+            message = JSON.parse(message);
+        } catch (error) {
+            return;
+        }
+        console.log(message)
+        if (this[message.type])
+            this[message.type](message);
+    } 
+    ping(message){
+        this.send({type:'ping'})
+        this.saveGame()
+    }
+    open(message){
+        if (this.gameEnd) return
+        const cellNum = message.data;
+        var field = this.game.field;
+        if (field[cellNum] == -1) {
+            this.gameEnd = true;
+            for (let i = 0; i < field.length; i++) {
+                if (field[i] == -1) this.userField[i] = -1;
+            }
+            this.game.players.find(player => player.username == this.username).points = 0;
+            this.users.updateOne({username:this.username},{$set:{game:null}});
+            this.send({type: 'gameover',data:{cellNum:cellNum,userField: this.userField}})
             return
         }
-        console.log(data)
-        switch (data.type) {
-            case 'ping': {
-                socket.send(JSON.stringify({type: 'pong'}))
-                break;
-            } 
-            // case 'loadgame':{
-            //     if (!gameEnd)
-            //     socket.send(JSON.stringify({type: 'loadgame',game:game}));
-            //     break;
-            // }
-            case "open":{
-                if (gameEnd) return
-                const cellNum = data.data;
-                var field = game.field;
-                if (field[cellNum] == -1) {
-                    gameEnd = true;
-                    for (let i = 0; i < field.length; i++) {
-                        if (field[i] == -1) userField[i] = -1;
-                    }
-                    game.players.find(player => player.username == username).points = 0;
-                    users.updateOne({username:username},{$set:{game:null}});
-                    socket.send(JSON.stringify({type: 'gameover',data:{cellNum:cellNum,userField: userField}}))
-                    
-                    return
-                }
-                let minesCount = 0;
-                let cellsCount = 0;
-                let size = game.size;
-                let cells = size * size;
-                const x = cellNum % size;
-                const y = Math.floor(cellNum / size);
-                if (x > 0) {
-                    if (field[cellNum - 1] == -1) minesCount++;
-                }
-                if (x < size - 1) {
-                    if (field[cellNum + 1] == -1) minesCount++;
-                }
-                if (y > 0) {
-                    if (field[cellNum - size] == -1) minesCount++;
-                }
-                if (y < size - 1) {
-                    if (field[cellNum + size] == -1) minesCount++;
-                }
-                if (x > 0 && y > 0) {
-                    if (field[cellNum - size - 1] == -1) minesCount++;
-                }
-                if (x > 0 && y < size - 1) {
-                    if (field[cellNum + size - 1] == -1) minesCount++;
-                }
-                if (x < size - 1 && y > 0) {
-                    if (field[cellNum - size + 1] == -1) minesCount++;
-                }
-                if (x < size - 1 && y < size - 1) {
-                    if (field[cellNum + size + 1] == -1) minesCount++;
-                }
-                game.players.find(player => player.username == username).points += minesCount;
-                userField[cellNum] = minesCount;
-                if (minesCount==0){
-                    const arr = openZerosAround(cellNum);
-                    // console.log(arr)
-                    for (let i = 0; i < arr.length; i++) {
-                        userField[arr[i]] = field[arr[i]];
-                    }
-
-                }
-                socket.send(JSON.stringify({type: 'open', data: {cellNum: cellNum, minesCount: minesCount,userField:userField,points:game.players.find(player => player.username == username).points}}))
-                checkWin()
-                break;
-            }
-            case "flag":{
-                if (gameEnd) return
-                const cellNum = data.data;
-                
-                if (userField[cellNum] == -3) {
-                    userField[cellNum] = -2;
-                } else {
-                    userField[cellNum] = -3;
-                }
-                
-                socket.send(JSON.stringify({type: 'open', data: {cellNum: cellNum,userField:userField,points:game.players.find(player => player.username == username).points}}))
-                //check if all mines are flagged and all other cells are opened
-                checkWin();
-
-                break;
-            }
-            case "leave":{
-                users.updateOne({username:username},{$set:{game:null}});
-                await socket.send(JSON.stringify({type: 'leave'}))
-                socket.close();
-                break;
-            }
+        let minesCount = 0;
+        let size = this.game.size;
+        const x = cellNum % size;
+        const y = Math.floor(cellNum / size);
+        if (x > 0) {
+            if (field[cellNum - 1] == -1) minesCount++;
         }
-
-    })
-
-    socket.on('close', () => {
-        console.log('closed')
-        //save full game
-
-        games.updateOne({uid:uid},{$set:{userField:userField,players:game.players}});
-
-    })
-
-    const checkWin = async () => {
-        let field = game.field;
-        let minesCount = field.filter(cell => cell == -1).length;
-        let rightFlagsCount = 0;
-        for (let i = 0; i < field.length; i++) {
-            if (field[i] == -1 && userField[i] == -3 ) rightFlagsCount++;
+        if (x < size - 1) {
+            if (field[cellNum + 1] == -1) minesCount++;
         }
-        let notOpened = userField.filter(cell => cell == -2).length;
-        if (minesCount == rightFlagsCount && notOpened == 0) {
-            gameEnd = true;
-            console.log("win")
-            users.updateOne({username:username},{$set:{game:null}});
-
-            // if (game.players.find(player => player.username == username).points > game.players.find(player => player.username == game.winner).points) {
-            //     game.winner = username;
-            // }
-
-            const gameTime = (Date.now() - game.timeStart)
-            console.log(`OLD TIME: ${ user.statistics.bestTime[game.difficulty]}`)
-            console.log(`NEW TIME: ${gameTime}`)
-            game.reward.stars = calcRating(game.difficulty,game.size,gameTime);
-            if (gameTime<= game.timeBet*1000) {
-                
-                await users.updateOne({username:username},{
-                    $inc:{
-                        balance:game.reward.bombs,
-                        rating:game.reward.stars,
-                        // [`statistics.wins.${game.difficulty}`]:1,   //only for multiplayer
-                        // [`statistics.games.${game.difficulty}`]:1,
-                    },
-                    $set:{
-                        [`statistics.bestTime.${game.difficulty}`]: user.statistics.bestTime[game.difficulty] > gameTime && user.statistics.bestTime[game.difficulty] > 0 ? gameTime : user.statistics.bestTime[game.difficulty] 
-                    }
-                });
-                console.log({[`statistics.bestTime.${game.difficulty}`]: user.statistics.bestTime[game.difficulty] > gameTime && user.statistics.bestTime[game.difficulty] > 0 ? gameTime : user.statistics.bestTime[game.difficulty] })
-                socket.send(JSON.stringify({type: 'win',data:{reward: true, bombs: game.reward.bombs, stars: game.reward.stars}}))
-            } else {
-                
-                await users.updateOne({username:username},{
-                    $inc:{
-                        // [`statistics.losses.${game.difficulty}`]:1,  //only for multiplayer
-                        // [`statistics.games.${game.difficulty}`]:1,
-                        
-                    },
-                    $set:{
-                        [`statistics.bestTime.${game.difficulty}`]: user.statistics.bestTime[game.difficulty] > gameTime && user.statistics.bestTime[game.difficulty] > 0  ? gameTime : user.statistics.bestTime[game.difficulty]
-                    }
-                });
-                socket.send(JSON.stringify({type: 'win',data:{reward: false}}))
+        if (y > 0) {
+            if (field[cellNum - size] == -1) minesCount++;
+        }
+        if (y < size - 1) {
+            if (field[cellNum + size] == -1) minesCount++;
+        }
+        if (x > 0 && y > 0) {
+            if (field[cellNum - size - 1] == -1) minesCount++;
+        }
+        if (x > 0 && y < size - 1) {
+            if (field[cellNum + size - 1] == -1) minesCount++;
+        }
+        if (x < size - 1 && y > 0) {
+            if (field[cellNum - size + 1] == -1) minesCount++;
+        }
+        if (x < size - 1 && y < size - 1) {
+            if (field[cellNum + size + 1] == -1) minesCount++;
+        }
+        this.game.players.find(player => player.username == this.username).points += minesCount;
+        this.userField[cellNum] = minesCount;
+        if (minesCount==0){
+            const arr = this.openZerosAround(cellNum);
+            for (let i = 0; i < arr.length; i++) {
+                this.userField[arr[i]] = field[arr[i]];
+                this.game.players.find(player => player.username == this.username).points += field[arr[i]];
             }
 
         }
+        this.send({type: 'open', data: {cellNum: cellNum, minesCount: minesCount,userField:this.userField,points:this.game.players.find(player => player.username == this.username).points}})
+        this.checkWin()
+    }
+    flag(message){
+        if (this.gameEnd) return
+        const cellNum = message.data;
+        
+        if (this.userField[cellNum] == -3) {
+            this.userField[cellNum] = -2;
+        } else {
+            this.userField[cellNum] = -3;
+        }
+        
+        this.send({type: 'open', data: {cellNum: cellNum,userField:this.userField,points:this.game.players.find(player => player.username == this.username).points}})
+        this.checkWin();
+    }
+    async leave(message){
+        this.users.updateOne({username:this.username},{$set:{game:null}});
+        this.send({type: 'leave'})
+        this.socket.close();
+    }
+    saveGame(){
+        this.games.updateOne({uid:this.uid},{$set:{userField:this.userField,players:this.game.players}});
+    }
+    onClose() {
+        console.log('Connection closed')
+        this.saveGame();
     }
 
-    const openZerosAround = (cellNum) => {
-        let field = game.field;
-        let size = game.size;
-
-
+    onError(err) {
+        console.log(err)
+    }
+    openZerosAround = (cellNum) => {
+        let field = this.game.field;
+        let size = this.game.size;
         let cellsToOpen = [cellNum];
         let cellsOpened = [];
         while (cellsToOpen.length > 0) {
@@ -225,28 +161,84 @@ const init = async (connection , req) => {
         return cellsOpened;
 
     }
+    checkWin = async () => {
+        let field = this.game.field;
+        let minesCount = field.filter(cell => cell == -1).length;
+        let rightFlagsCount = 0;
+        for (let i = 0; i < field.length; i++) {
+            if (field[i] == -1 && this.userField[i] == -3 ) rightFlagsCount++;
+        }
+        let notOpened = this.userField.filter(cell => cell == -2).length;
+        if (minesCount == rightFlagsCount && notOpened == 0) {
+            this.gameEnd = true;
+            this.users.updateOne({username:this.username},{$set:{game:null}});
 
-   
-}
+            // if (game.players.find(player => player.username == username).points > game.players.find(player => player.username == game.winner).points) {
+            //     game.winner = username;
+            // }
 
-
-const calcRating = (difficulty,size,time) => {
-    let rating = 0;
-    switch (difficulty) {
-        case "easy":
-            rating = 1;
-            break;
-        case "medium":
-            rating = 1.4;
-            break;
-        case "hard":
-            rating = 1.9;
-            break;
+            const gameTime = (Date.now() - this.game.timeStart)
+            this.game.reward.stars = this.calcRating(this.game.difficulty,this.game.size,gameTime);
+            if (gameTime<= this.game.timeBet*1000) {
+                
+                await this.users.updateOne({username:this.username},{
+                    $inc:{
+                        balance:this.game.reward.bombs,
+                        rating:this.game.reward.stars,
+                        // [`statistics.wins.${game.difficulty}`]:1,   //only for multiplayer
+                        // [`statistics.games.${game.difficulty}`]:1,
+                    },
+                    $set:{
+                        [`statistics.bestTime.${this.game.difficulty}`]: this.user.statistics.bestTime[this.game.difficulty] > gameTime && this.user.statistics.bestTime[this.game.difficulty] > 0 ? gameTime : this.user.statistics.bestTime[this.game.difficulty] 
+                    }
+                });
+                this.send({type: 'win',data:{reward: true, bombs: this.game.reward.bombs, stars: this.game.reward.stars}})
+            } else { 
+                await users.updateOne({username:this.username},{
+                    $set:{
+                        [`statistics.bestTime.${this.game.difficulty}`]: this.user.statistics.bestTime[this.game.difficulty] > gameTime && this.user.statistics.bestTime[this.game.difficulty] > 0 ? gameTime : this.user.statistics.bestTime[this.game.difficulty] 
+                    }
+                });
+                socket.send({type: 'win',data:{reward: false}})
+            }
+        }
     }
-    rating += size/10;
-    rating += 1/time*100;
-    return Math.ceil(rating);
+    calcRating = (difficulty,size,time) => {
+        let rating = 0;
+        switch (difficulty) {
+            case "easy":
+                rating = 1;
+                break;
+            case "medium":
+                rating = 1.4;
+                break;
+            case "hard":
+                rating = 1.9;
+                break;
+        }
+        rating += size/10;
+        rating += 1/time*100;
+        return Math.ceil(rating);
+    }
+
 }
+
+const init = async (connection , req) => {
+    let { socket } = connection;
+    console.log("New connection")
+    try {
+        var newConnection = await new NewConnection(connection,req);
+    } catch (error) {
+        console.log(error)
+        await socket.send(JSON.stringify({type: 'error',data:error.message}))
+        await socket.close();
+        return
+    }
+}
+
+
+
+
 
 module.exports = {
     init

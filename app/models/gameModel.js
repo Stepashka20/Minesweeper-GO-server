@@ -22,12 +22,15 @@ const createGame = async (req,gameParams,field) => {
         players: [{
             username: user.username,
             avatar: user.avatar,
+            customisation: {
+                usernameColor: user.shop.usernameColor,
+                avatarBorder: user.shop.avatarBorder,
+            },
             rating: user.rating,
             points: 0,
         }],
         timeBet: reward.time, 
         timeStart: Date.now(),
-        status: 'waiting',
         uid: randString(10)
     }
     await games.insertOne(game);
