@@ -48,7 +48,7 @@ const getGame = async (req,uid) => {
     // console.log(game)
     // return null
     const username = req.jwt.decode(req.headers.authorization.split(' ')[1]).username;
-    if (!game.players.map(p => p.username).includes(username)) {
+    if (!game.players.map(p => p.username).includes(username) && game.mode != "multiplayer") {
         return null
     }
     var userResp = game
@@ -141,8 +141,130 @@ const calcRewardTime = (difficulty,size,timeBet) => {
     
 }
 
+
+const createGameAndLobby = async (req,gameParams,field) => {
+    const users = req.mongo.collection('users');
+    const decodedToken = req.jwt.decode(req.headers.authorization.split(' ')[1]);
+    const user = await users.findOne({username:decodedToken.username});
+
+    const games = req.mongo.collection('games');
+
+    const game = {
+        mode: "multiplayer",
+        status: "waiting",
+        field: field,
+        userFields: [
+            {
+                username: user.username,
+                field:[...Array(field.length).keys()].map(i => -2)
+            },
+            {
+                username: "",
+                field:[...Array(field.length).keys()].map(i => -2)
+            }
+        ],
+        size: gameParams.size,
+        difficulty: gameParams.difficulty,
+        reward: {
+            bombs: gameParams.betType == "balance" ? gameParams.bet : 0,
+            stars: gameParams.betType == "rating" ? gameParams.bet : 0
+        },
+        players: [{
+            username: user.username,
+            avatar: user.avatar,
+            customisation: {
+                usernameColor: user.shop.usernameColor,
+                avatarBorder: user.shop.avatarBorder,
+            },
+            rating: user.rating,
+            points: 0,
+        }],
+        timeStart: 0,
+        uid: randString(10)
+    }
+    await games.insertOne(game);
+    await users.updateOne({username:user.username},{$set:{game:game.uid}});
+    return {uid:game.uid};
+}
+
+const check = async (req, type, value) =>{
+    const users = req.mongo.collection('users');
+    const decodedToken = req.jwt.decode(req.headers.authorization.split(' ')[1]);
+    const user = await users.findOne({username:decodedToken.username});
+    console.log(type,value,user[type])
+    if (user[type] < value) {
+        return `У вас недостаточно ${type == "balance" ? "денег": "рейтинга"}!`
+    }
+    return null
+
+}
+
+const getLobbies = async (req) => {
+    const games = req.mongo.collection('games');
+    const lobbies = await games.find({mode:"multiplayer",status:"waiting"}).toArray();
+
+   
+    return lobbies.map(lobby => {
+        return {
+            username: lobby.players[0].username,
+            avatar: lobby.players[0].avatar,
+            customisation: lobby.players[0].customisation,  //TODO get current user customisation using aggregate
+            betType: lobby.reward.bombs > 0 ? "money" : "rating",
+            bet: lobby.reward.bombs > 0 ? lobby.reward.bombs : lobby.reward.stars,
+            size: lobby.size,
+            difficulty: lobby.difficulty,
+            uid: lobby.uid
+        }
+    })
+}
+
+const joinGame = async (req,uid) => {
+    const users = req.mongo.collection('users');
+    const decodedToken = req.jwt.decode(req.headers.authorization.split(' ')[1]);
+    const user = await users.findOne({username:decodedToken.username});
+
+    const games = req.mongo.collection('games');
+    const game = await games.findOne({uid:uid});
+
+    //set game playing, set start time, add user to players, set usernmae to userFields[1].username
+    await games.updateOne({uid:uid},
+        {$set:{
+            status: "playing",
+            timeStart: Date.now(),
+            players: [...game.players,{
+                username: user.username,
+                avatar: user.avatar,
+                customisation: {
+                    usernameColor: user.shop.usernameColor,
+                    avatarBorder: user.shop.avatarBorder,
+                },
+                rating: user.rating,
+                points: 0,
+            }],
+            userFields: [
+                game.userFields[0],
+                {
+                    username: user.username,
+                    field:[...Array(game.field.length).keys()].map(i => -2)
+                }
+            ]
+        }}
+    );
+    await users.updateOne({username:user.username},{$set:{game:uid}});
+    let updatedGame = await games.findOne({uid:uid});
+    
+    delete updatedGame._id;
+    delete updatedGame.field;
+    return updatedGame
+
+}
+
 module.exports = {
     generateField,
     createGame,
-    getGame
+    getGame,
+    createGameAndLobby,
+    check,
+    getLobbies,
+    joinGame
 }

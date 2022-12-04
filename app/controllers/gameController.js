@@ -1,7 +1,8 @@
 const gameModel = require('../models/gameModel');
 
 const getLobbies = async (req, res) => {
-
+    const lobbies = await gameModel.getLobbies(req);
+    res.send(lobbies);
 
 }
 
@@ -25,11 +26,49 @@ const getGame = async (req, res) => {
     }
     res.send(game);
 }
+//TODO schema validation
+const createLobby = async (req, res) => {
+    const gameParams = req.body;
+    console.log(gameParams)
+    //TODO check if user is in game or lobby
 
+    const check = await gameModel.check(req,gameParams.betType,gameParams.bet)
+    console.log(check)
+    if (check) {
+        return res.status(400).send({message: check});
+    }
+    const field = gameModel.generateField(gameParams.size, gameParams.difficulty);
+    const gameUID = await gameModel.createGameAndLobby(req,gameParams,field);
+    res.send(gameUID);
 
+}
+const joinLobby = async (req, res) => {
+    const uid = req.params['*']
+    const game = await gameModel.getGame(req,uid);
+    const decodedToken = req.jwt.decode(req.headers.authorization.split(' ')[1]);
+    const username = decodedToken.username;
+    if (!game) {
+        return res.status(404).send({message: "Игра не найдена"}); 
+    }
+    if (game.players.length >= 2) {
+        return res.status(400).send({message: "Лобби заполнено"}); 
+    }
+    if (game.players[0].username == username) {
+        return res.status(400).send({message: "Вы не можете присоединиться к своей игре"});
+    }
+    const check = await gameModel.check(req,game.reward.bombs > 0 ? "balance" : "rating",game.reward.bombs > 0 ? game.reward.bombs : game.reward.stars)
+    console.log(check)
+    if (check) {
+        return res.status(400).send({message: check});
+    }
+    const newGame = await gameModel.joinGame(req,uid);
+    res.send(newGame);
 
+}
 module.exports = {
     getLobbies,
     startGame,
-    getGame
+    getGame,
+    createLobby,
+    joinLobby
 }

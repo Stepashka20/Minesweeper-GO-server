@@ -4,6 +4,7 @@ const helmet = require('@fastify/helmet');
 const autoload = require('@fastify/autoload');
 const path = require('path');
 const fastify_graceful_shutdown = require('fastify-graceful-shutdown')
+const multiplayerSocketService = require('./app/services/multiplayerSocketService');
 require('dotenv').config();
 
 
@@ -23,6 +24,7 @@ const start = async () => {
                 headerPairs: 50   // Max number of header key=>value pairs
             }
         });
+        multiplayerSocketService.init();
         app.register(cors, {
             origin: '*',
             methods: ['GET', 'POST', 'PUT', 'DELETE'],
@@ -57,9 +59,7 @@ const start = async () => {
                 reply.send(err)
             }
         })
-        app.decorate("authenticateWS", async function(request, reply) {
-           
-        })
+
         app.addHook('onRequest', (req, res, next) => {
             const url_path = req.raw.url;
             console.log(`[${new Date().toLocaleTimeString()}] ${req.method} ${url_path} ${JSON.stringify(req.query)??""} ${JSON.stringify(req.params)??""}`);

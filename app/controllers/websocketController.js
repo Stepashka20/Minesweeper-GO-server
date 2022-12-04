@@ -1,4 +1,4 @@
-// const cdnModel = require('../models/cdnModel');
+const {multiplayerSocketService} = require('../services/multiplayerSocketService');
 
 class NewConnection {
     constructor(connection , req) {
@@ -10,20 +10,31 @@ class NewConnection {
             this.username = req.jwt.decode(req.headers.authorization.split(' ')[1]).username;
             this.game = await this.games.findOne({uid:this.uid});
             this.user = await this.users.findOne({username:this.username,game: this.uid});
-            this.userField = this.game.userField;
+            this.userField = this.game.userFields.find(userField => userField.username == this.username).field;
+            this.send = async (data) => this.socket.send(JSON.stringify(data))
             if (!this.user || !this.game)
                 throw new Error("Игра не найдена")
-            
+
+            if (this.game.mode == "multiplayer") {
+                const players = this.game.players.map(player => player.username);
+                if (players.length == 2 && !players.includes(this.username))
+                    throw new Error("Игра уже заполнена")
+                multiplayerSocketService().addPlayer(this.uid,this.socket, this.username,this.onStartGame.bind(this));
+            }
             this.gameField = this.game.field;
             this.gameEnd = false
             this.socket.on('message', this.onMessage.bind(this))
             this.socket.on('close', this.onClose.bind(this))
             this.socket.on('error', this.onError.bind(this))
-            this.send = async (data) => this.socket.send(JSON.stringify(data))
+            
             return this;
         })(connection , req);
     }
-
+    onStartGame(lobby){
+        this.lobby = lobby;
+        console.log(this.username + " start game")
+        this.send({type:'startgame',data:{field:this.gameField,players:lobby.players.map(player => player.username)}})
+    }
     onMessage(message) {
         try {
             message = JSON.parse(message);
@@ -33,9 +44,9 @@ class NewConnection {
         console.log(message)
         if (this[message.type])
             this[message.type](message);
-    } 
+    }  
     ping(message){
-        this.send({type:'ping'})
+        this.send({type:'pong'})
         this.saveGame()
     }
     open(message){
