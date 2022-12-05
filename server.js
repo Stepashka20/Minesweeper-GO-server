@@ -12,7 +12,7 @@ const start = async () => {
     try {
         const app = Fastify({
             logger:false,
-            forceCloseConnections: true,
+            // forceCloseConnections: true,
         });
         app.register(require('@fastify/multipart'), {
             limits: {

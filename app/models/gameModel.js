@@ -178,6 +178,7 @@ const createGameAndLobby = async (req,gameParams,field) => {
             },
             rating: user.rating,
             points: 0,
+            status: "playing"
         }],
         timeStart: 0,
         uid: randString(10)
@@ -240,6 +241,7 @@ const joinGame = async (req,uid) => {
                 },
                 rating: user.rating,
                 points: 0,
+                status: "playing"
             }],
             userFields: [
                 game.userFields[0],
