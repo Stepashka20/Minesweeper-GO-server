@@ -53,7 +53,7 @@ class NewConnection {
     }  
     ping(message){
         this.send({type:'pong'})
-        this.saveGame()
+        // this.saveGame()
     }
     open = async (message) => {
         if (this.gameEnd) return
@@ -62,16 +62,14 @@ class NewConnection {
         if (field[cellNum] == -1) {
             this.gameEnd = true;
             this.users.updateOne({username:this.username},{$set:{game:null}});
-            if (this.game.mode == "multiplayer") {
-                await defeat();
-            } else {
-                for (let i = 0; i < field.length; i++) {
-                    if (field[i] == -1) this.userField[i] = -1;
-                }
-                this.game.players.find(player => player.username == this.username).points = 0;
-                this.send({type: 'gameover',data:{cellNum:cellNum,userField: this.userField}})
-                
+            for (let i = 0; i < field.length; i++) {
+                if (field[i] == -1) this.userField[i] = -1;
             }
+            // this.game.players.find(player => player.username == this.username).points = 0;
+            this.send({type: 'gameover',data:{cellNum:cellNum,userField: this.userField}})
+            if (this.game.mode == "multiplayer") {
+                await this.defeat();
+            } 
             return
             
         }
@@ -193,69 +191,80 @@ class NewConnection {
         const opponentProfile = await this.users.findOne({username: opponent.username});
         const myPoints = this.game.players.find(player => player.username == this.username).points
         const gameTime = (Date.now() - this.game.timeStart)
-
+        console.log(myPoints,opponent.points)
         if (opponent.status == "finished"){
+            
             let winner = {
                 username: opponent.username,
                 gameTime: opponent.gameTime,
                 statistics: opponentProfile.statistics,
+                soket: this.lobby.players.find(x=>x.username == opponent.username).socket
             }
             let loser = {
                 username: this.username,
                 gameTime: gameTime,
                 statistics: this.user.statistics,
+                soket: this.socket
             }
-            await this.addGameResult(winner,loser)
+            await this.addGameResult(winner,loser,"Противник завершил карту,а ты проиграл")
         } else if (opponent.status == "defeat"){
             if (myPoints > opponent.points){
                 let winner = {
                     username: this.username,
                     gameTime: gameTime,
                     statistics: this.user.statistics,
+                    soket: this.socket
                 }
                 let loser = {
                     username: opponent.username,
                     gameTime: opponent.gameTime,
                     statistics: opponentProfile.statistics,
+                    soket: this.lobby.players.find(x=>x.username == opponent.username).socket
                 }
-                await this.addGameResult(winner,loser)
+                await this.addGameResult(winner,loser,"Противник проиграл,а ты выиграл по очкам")
             } else if (myPoints < opponent.points){
                 let winner = {
                     username: opponent.username,
                     gameTime: opponent.gameTime,
                     statistics: opponentProfile.statistics,
+                    soket: this.lobby.players.find(x=>x.username == opponent.username).socket
                 }
                 let loser = {
                     username: this.username,
                     gameTime: gameTime,
                     statistics: this.user.statistics,
+                    soket: this.socket
                 }
-                await this.addGameResult(winner,loser)
+                await this.addGameResult(winner,loser,"Противник выиграл по очкам,а ты проиграл")
             } else {
                 if (opponent.time < gameTime){
                     let winner = {
                         username: opponent.username,
                         gameTime: opponent.gameTime,
                         statistics: opponentProfile.statistics,
+                        soket: this.lobby.players.find(x=>x.username == opponent.username).socket
                     }
                     let loser = {
                         username: this.username,
                         gameTime: gameTime,
                         statistics: this.user.statistics,
+                        soket: this.socket
                     }
-                    await this.addGameResult(winner,loser)
+                    await this.addGameResult(winner,loser,"Противник выиграл по времени,а ты проиграл")
                 } else {
                     let winner = {
                         username: this.username,
                         gameTime: gameTime,
                         statistics: this.user.statistics,
+                        soket: this.socket
                     }
                     let loser = {
                         username: opponent.username,
                         gameTime: opponent.gameTime,
                         statistics: opponentProfile.statistics,
+                        soket: this.lobby.players.find(x=>x.username == opponent.username).socket
                     }
-                    await this.addGameResult(winner,loser)
+                    await this.addGameResult(winner,loser,"Противник проиграл по времени,а ты выиграл")
                 }
             }
         } else {
@@ -263,7 +272,10 @@ class NewConnection {
             this.lobby.players.find(x=>x.username != this.username).socket.send(JSON.stringify({type:'opponent_status',data:{status:"defeat"}}))
         }
     }
-    addGameResult = async (winner, loser) => {
+    addGameResult = async (winner, loser,reason) => {
+        console.log(`winner: ${winner.username}, loser: ${loser.username}, reason: ${reason}`)
+        winner.soket.send(JSON.stringify({type: 'win',data:{reward: true, bombs: this.game.reward.bombs, stars: this.game.reward.stars}}))
+        loser.soket.send(JSON.stringify({type:'lose'}))
         await this.users.updateOne({username: winner.username},{
             $inc:{
                 balance:this.game.reward.bombs*2,
@@ -295,6 +307,7 @@ class NewConnection {
         let notOpened = this.userField.filter(cell => cell == -2).length;
         if (minesCount == rightFlagsCount && notOpened == 0) {
             this.gameEnd = true;
+            console.log("checkWin",this.username)
             this.users.updateOne({username:this.username},{$set:{game:null}});
             if (this.game.mode == "multiplayer") {
                 const newgame = await this.games.findOne({uid:this.uid});
@@ -385,7 +398,7 @@ class NewConnection {
                             [`statistics.bestTime.${this.game.difficulty}`]: this.user.statistics.bestTime[this.game.difficulty] > gameTime && this.user.statistics.bestTime[this.game.difficulty] > 0 ? gameTime : this.user.statistics.bestTime[this.game.difficulty] 
                         }
                     });
-                    
+                    this.send({type: 'win',data:{reward: true, bombs: this.game.reward.bombs, stars: this.game.reward.stars}})
                 } else { 
                     await this.users.updateOne({username:this.username},{
                         $set:{
