@@ -33,7 +33,7 @@ class NewConnection {
     async onStartGame(lobby){
         this.lobby = lobby;
         this.game = await this.games.findOne({uid:this.uid});
-        //copt object
+
         let userResp = JSON.parse(JSON.stringify(this.game));
         delete userResp.field;
         delete userResp._id;
@@ -41,13 +41,17 @@ class NewConnection {
         this.send({type:'startgame',data:{gameParams:userResp,players:lobby.players.map(player => player.username)}})
         
     }
+    async gameDeleted(){
+        this.gameEnd = true
+        this.socket.close()
+    }
     onMessage(message) {
         try {
             message = JSON.parse(message);
         } catch (error) {
             return;
         }
-        console.log(message)
+        if (message.type != "ping") console.log(message)
         if (this[message.type])
             this[message.type](message);
     }  
@@ -130,6 +134,9 @@ class NewConnection {
         this.send({type: 'open', data: {cellNum: cellNum,userField:this.userField,points:this.game.players.find(player => player.username == this.username).points}})
         this.checkWin();
     }
+    opponent_status(message){
+        if (message.data.status == "win") this.gameEnd = true
+    }
     async leave(message){
         this.users.updateOne({username:this.username},{$set:{game:null}});
         this.send({type: 'leave'})
@@ -198,13 +205,15 @@ class NewConnection {
                 username: opponent.username,
                 gameTime: opponent.gameTime,
                 statistics: opponentProfile.statistics,
-                soket: this.lobby.players.find(x=>x.username == opponent.username).socket
+                soket: this.lobby.players.find(x=>x.username == opponent.username).socket,
+                timeRecord: true
             }
             let loser = {
                 username: this.username,
                 gameTime: gameTime,
                 statistics: this.user.statistics,
-                soket: this.socket
+                soket: this.socket,
+                timeRecord: false
             }
             await this.addGameResult(winner,loser,"Противник завершил карту,а ты проиграл")
         } else if (opponent.status == "defeat"){
@@ -213,13 +222,15 @@ class NewConnection {
                     username: this.username,
                     gameTime: gameTime,
                     statistics: this.user.statistics,
-                    soket: this.socket
+                    soket: this.socket,
+                    timeRecord: false
                 }
                 let loser = {
                     username: opponent.username,
                     gameTime: opponent.gameTime,
                     statistics: opponentProfile.statistics,
-                    soket: this.lobby.players.find(x=>x.username == opponent.username).socket
+                    soket: this.lobby.players.find(x=>x.username == opponent.username).socket,
+                    timeRecord: false
                 }
                 await this.addGameResult(winner,loser,"Противник проиграл,а ты выиграл по очкам")
             } else if (myPoints < opponent.points){
@@ -227,13 +238,15 @@ class NewConnection {
                     username: opponent.username,
                     gameTime: opponent.gameTime,
                     statistics: opponentProfile.statistics,
-                    soket: this.lobby.players.find(x=>x.username == opponent.username).socket
+                    soket: this.lobby.players.find(x=>x.username == opponent.username).socket,
+                    timeRecord: false
                 }
                 let loser = {
                     username: this.username,
                     gameTime: gameTime,
                     statistics: this.user.statistics,
-                    soket: this.socket
+                    soket: this.socket,
+                    timeRecord: false
                 }
                 await this.addGameResult(winner,loser,"Противник выиграл по очкам,а ты проиграл")
             } else {
@@ -242,13 +255,15 @@ class NewConnection {
                         username: opponent.username,
                         gameTime: opponent.gameTime,
                         statistics: opponentProfile.statistics,
-                        soket: this.lobby.players.find(x=>x.username == opponent.username).socket
+                        soket: this.lobby.players.find(x=>x.username == opponent.username).socket,
+                        timeRecord: false
                     }
                     let loser = {
                         username: this.username,
                         gameTime: gameTime,
                         statistics: this.user.statistics,
-                        soket: this.socket
+                        soket: this.socket,
+                        timeRecord: false
                     }
                     await this.addGameResult(winner,loser,"Противник выиграл по времени,а ты проиграл")
                 } else {
@@ -256,13 +271,15 @@ class NewConnection {
                         username: this.username,
                         gameTime: gameTime,
                         statistics: this.user.statistics,
-                        soket: this.socket
+                        soket: this.socket,
+                        timeRecord: false
                     }
                     let loser = {
                         username: opponent.username,
                         gameTime: opponent.gameTime,
                         statistics: opponentProfile.statistics,
-                        soket: this.lobby.players.find(x=>x.username == opponent.username).socket
+                        soket: this.lobby.players.find(x=>x.username == opponent.username).socket,
+                        timeRecord: false
                     }
                     await this.addGameResult(winner,loser,"Противник проиграл по времени,а ты выиграл")
                 }
@@ -274,8 +291,8 @@ class NewConnection {
     }
     addGameResult = async (winner, loser,reason) => {
         console.log(`winner: ${winner.username}, loser: ${loser.username}, reason: ${reason}`)
-        winner.soket.send(JSON.stringify({type: 'win',data:{reward: true, bombs: this.game.reward.bombs, stars: this.game.reward.stars}}))
-        loser.soket.send(JSON.stringify({type:'lose'}))
+        await winner.soket.send(JSON.stringify({type: 'win',data:{reward: true, bombs: this.game.reward.bombs, stars: this.game.reward.stars}}))
+        await loser.soket.send(JSON.stringify({type:'lose'}))
         await this.users.updateOne({username: winner.username},{
             $inc:{
                 balance:this.game.reward.bombs*2,
@@ -284,7 +301,7 @@ class NewConnection {
                 [`statistics.games.${this.game.difficulty}`]:1,
             },
             $set:{
-                [`statistics.bestTime.${this.game.difficulty}`]: winner.statistics.bestTime[this.game.difficulty] > winner.gameTime && winner.statistics.bestTime[this.game.difficulty] > 0 ? winner.gameTime : winner.statistics.bestTime[this.game.difficulty]
+                [`statistics.bestTime.${this.game.difficulty}`]: winner.statistics.bestTime[this.game.difficulty] > winner.gameTime && winner.statistics.bestTime[this.game.difficulty] > 0 && winner.timeRecord ? winner.gameTime : winner.statistics.bestTime[this.game.difficulty]
             }
         });
         await this.users.updateOne({username:loser.username},{
@@ -293,7 +310,7 @@ class NewConnection {
                 [`statistics.games.${this.game.difficulty}`]:1,
             },
             $set:{
-                [`statistics.bestTime.${this.game.difficulty}`]: loser.statistics.bestTime[this.game.difficulty] > loser.gameTime && loser.statistics.bestTime[this.game.difficulty] > 0 ? loser.gameTime : loser.statistics.bestTime[this.game.difficulty] 
+                [`statistics.bestTime.${this.game.difficulty}`]: loser.statistics.bestTime[this.game.difficulty] > loser.gameTime && loser.statistics.bestTime[this.game.difficulty] > 0 && loser.timeRecord ? loser.gameTime : loser.statistics.bestTime[this.game.difficulty] 
             }
         });
     }
@@ -313,77 +330,25 @@ class NewConnection {
                 const newgame = await this.games.findOne({uid:this.uid});
                 const opponent = newgame.players.find(player => player.username != this.username);
                 const opponentProfile = await this.users.findOne({username: opponent.username});
-                const myPoints = this.game.players.find(player => player.username == this.username).points
+               
                 const gameTime = (Date.now() - this.game.timeStart)
-                if (opponent.status == "finished"){
-                    if (gameTime < opponent.time){
-                        this.users.updateOne({username:this.username},{
-                            $inc:{
-                                balance:this.game.reward.bombs,
-                                rating:this.game.reward.stars,
-                                [`statistics.wins.${this.game.difficulty}`]:1,
-                                [`statistics.games.${this.game.difficulty}`]:1,
-                            },
-                            $set:{
-                                [`statistics.bestTime.${this.game.difficulty}`]: this.user.statistics.bestTime[this.game.difficulty] > gameTime && this.user.statistics.bestTime[this.game.difficulty] > 0 ? gameTime : this.user.statistics.bestTime[this.game.difficulty] 
-                            }
-                        });
-                        this.users.updateOne({username: opponent.username},{
-                            $inc:{
-                                [`statistics.losses.${this.game.difficulty}`]:1,
-                                [`statistics.games.${this.game.difficulty}`]:1,
-                            },
-                            $set:{
-                                [`statistics.bestTime.${this.game.difficulty}`]: opponentProfile.statistics.bestTime[this.game.difficulty] > gameTime && opponentProfile.statistics.bestTime[this.game.difficulty] > 0 ? gameTime : opponentProfile.statistics.bestTime[this.game.difficulty]
-                            }
-                        });
-                    } else {
-                        await this.users.updateOne({username: opponent.username},{
-                            $inc:{
-                                balance:this.game.reward.bombs,
-                                rating:this.game.reward.stars,
-                                [`statistics.wins.${this.game.difficulty}`]:1,
-                                [`statistics.games.${this.game.difficulty}`]:1,
-                            },
-                            $set:{
-                                [`statistics.bestTime.${this.game.difficulty}`]: opponentProfile.statistics.bestTime[this.game.difficulty] > gameTime && opponentProfile.statistics.bestTime[this.game.difficulty] > 0 ? gameTime : opponentProfile.statistics.bestTime[this.game.difficulty]
-                            }
-                        });
-                        this.users.updateOne({username:this.username},{
-                            $inc:{
-                                [`statistics.losses.${this.game.difficulty}`]:1,
-                                [`statistics.games.${this.game.difficulty}`]:1,
-                            },
-                            $set:{
-                                [`statistics.bestTime.${this.game.difficulty}`]: this.user.statistics.bestTime[this.game.difficulty] > gameTime && this.user.statistics.bestTime[this.game.difficulty] > 0 ? gameTime : this.user.statistics.bestTime[this.game.difficulty] 
-                            }
-                        });
-                    }
-                } else if (opponent.status == "defeat") {
-                    this.users.updateOne({username:this.username},{
-                        $inc:{
-                            balance:this.game.reward.bombs,
-                            rating:this.game.reward.stars,
-                            [`statistics.wins.${this.game.difficulty}`]:1,
-                            [`statistics.games.${this.game.difficulty}`]:1,
-                        },
-                        $set:{
-                            [`statistics.bestTime.${this.game.difficulty}`]: this.user.statistics.bestTime[this.game.difficulty] > gameTime && this.user.statistics.bestTime[this.game.difficulty] > 0 ? gameTime : this.user.statistics.bestTime[this.game.difficulty] 
-                        }
-                    });
-                    this.users.updateOne({username: opponent.username},{
-                        $inc:{
-                            [`statistics.losses.${this.game.difficulty}`]:1,
-                            [`statistics.games.${this.game.difficulty}`]:1,
-                        },
-                        $set:{
-                            [`statistics.bestTime.${this.game.difficulty}`]: opponentProfile.statistics.bestTime[this.game.difficulty] > gameTime && opponentProfile.statistics.bestTime[this.game.difficulty] > 0 ? gameTime : opponentProfile.statistics.bestTime[this.game.difficulty]
-                        }
-                    });
-                } else {
-                    this.games.updateOne({uid:this.uid},{$set:{players:newgame.players.map(player => player.username == this.username ? {...player,status:"finished",points: myPoints,time:gameTime} : player)}});
-                    this.lobby.players.find(x=>x.username != this.username).socket.send(JSON.stringify({type:'opponent_status',data:{status:"finished"}}))
+
+                const winner = {
+                    username: this.username,
+                    gameTime: gameTime,
+                    statistics: this.user.statistics,
+                    soket: this.socket,
+                    timeRecord: true
                 }
+                const loser = {
+                    username: opponent.username,
+                    gameTime: opponent.time,
+                    statistics: opponentProfile.statistics,
+                    soket: this.lobby.players.find(x=>x.username == opponent.username).socket,
+                    timeRecord: false
+                }
+                await this.addGameResult(winner,loser,"Я выиграл,а противник проиграл вообще")
+                this.lobby.players.find(x=>x.username == opponent.username).socket.emit("message",JSON.stringify({type:"opponent_status",data:{status:"win"}}))
             } else {
                 const gameTime = (Date.now() - this.game.timeStart)
                 this.game.reward.stars = this.calcRating(this.game.difficulty,this.game.size,gameTime);

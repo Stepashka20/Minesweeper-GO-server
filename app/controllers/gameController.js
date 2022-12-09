@@ -62,13 +62,25 @@ const joinLobby = async (req, res) => {
         return res.status(400).send({message: check});
     }
     const newGame = await gameModel.joinGame(req,uid);
-    res.send(newGame);
+    res.send({newGame:newGame.gameInfo.uid,balance: newGame.balance, rating: newGame.rating});
 
+}
+const deleteLobby = async (req, res) => {
+    const decodedToken = req.jwt.decode(req.headers.authorization.split(' ')[1]);
+    const username = decodedToken.username;
+    
+    if (!gameModel.checkCreator(req,username)) {
+        return res.status(403).send({message: "Вы не можете удалить эту игру"});
+    }
+    console.log(username)
+    const refundBet = await gameModel.deleteGame(req,username);
+    res.send({message: "Вы вышли из лобби", refundBet});
 }
 module.exports = {
     getLobbies,
     startGame,
     getGame,
     createLobby,
-    joinLobby
+    joinLobby,
+    deleteLobby
 }

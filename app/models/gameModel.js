@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-
+const {multiplayerSocketService} = require('../services/multiplayerSocketService');
 
 const createGame = async (req,gameParams,field) => {
     const users = req.mongo.collection('users');
@@ -153,6 +153,7 @@ const createGameAndLobby = async (req,gameParams,field) => {
         mode: "multiplayer",
         status: "waiting",
         field: field,
+        creator: user.username,
         userFields: [
             {
                 username: user.username,
@@ -184,8 +185,8 @@ const createGameAndLobby = async (req,gameParams,field) => {
         uid: randString(10)
     }
     await games.insertOne(game);
-    await users.updateOne({username:user.username},{$set:{game:game.uid}});
-    return {uid:game.uid};
+    await users.updateOne({username:user.username},{$set:{game:game.uid},$inc:{balance:-game.reward.bombs,rating:-game.reward.stars}});
+    return {uid:game.uid,balance:user.balance-game.reward.bombs,rating:user.rating-game.reward.stars};
 }
 
 const check = async (req, type, value) =>{
@@ -252,15 +253,40 @@ const joinGame = async (req,uid) => {
             ]
         }}
     );
-    await users.updateOne({username:user.username},{$set:{game:uid}});
+    await users.updateOne({username:user.username},{$set:{game:uid},$inc:{balance:-game.reward.bombs,stars:-game.reward.stars}});
     let updatedGame = await games.findOne({uid:uid});
     
     delete updatedGame._id;
     delete updatedGame.field;
-    return updatedGame
+    return {
+        gameInfo: updatedGame,
+        balance: user.balance-game.reward.bombs,
+        stars: user.stars-game.reward.stars
+    }
 
 }
+const checkCreator = async (req,username) => {
+    const users = req.mongo.collection('users');
+    const user = await users.findOne({username});
+    
+    const games = req.mongo.collection('games');
+    const game = await games.findOne({uid:user.game});
+    return game.creator == username && game.status == "waiting";
+}
 
+const deleteGame = async (req,username) => {
+    const users = req.mongo.collection('users');
+    const games = req.mongo.collection('games');
+
+    const user = await users.findOne({username});
+    const game = await games.findOne({uid:user.game});
+    
+    await games.deleteOne({uid:user.game});
+    
+    await users.updateOne({username},{$set:{game:null},$inc:{balance: game.reward.bombs, rating: game.reward.stars}});
+    await multiplayerSocketService().deleteGame(user.game);
+    return {balance: user.balance+game.reward.bombs, rating: user.rating+game.reward.stars}
+}
 module.exports = {
     generateField,
     createGame,
@@ -268,5 +294,7 @@ module.exports = {
     createGameAndLobby,
     check,
     getLobbies,
-    joinGame
+    joinGame,
+    checkCreator,
+    deleteGame
 }

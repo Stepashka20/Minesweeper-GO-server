@@ -31,6 +31,10 @@ const start = async () => {
             allowedHeaders: ['*'],
             credentials: true,
         });
+        app.setErrorHandler(function (error, request, reply) {
+            console.log(error)
+            reply.status(500).send({ message: "Ошибка сервера" })
+        })
         app.register(require('@fastify/websocket'))
         app.register(require('@fastify/mongodb'), {
             forceClose: true,

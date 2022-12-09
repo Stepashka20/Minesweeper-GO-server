@@ -5,7 +5,6 @@ class MultiplayerSocketService {
     }
     
     addPlayer(uid, socket,username ,callback) {
-        // this.users[username] = socket;
         if (!this.lobbies[uid]) {
             this.lobbies[uid] = {
                 players: [] 
@@ -23,9 +22,17 @@ class MultiplayerSocketService {
             })
         }
     }
-
+    async deleteGame(uid) {
+        if (!this.lobbies[uid]) return
+        await this.lobbies[uid].players[0].socket.emit("message",JSON.stringify({type: "gameDeleted"}));
+        delete this.lobbies[uid];
+    }
     removeUser(username) {
         delete this.users[username];
+    }
+
+    sendToUser(username, message) {
+        
     }
 
     getUser(username) {
