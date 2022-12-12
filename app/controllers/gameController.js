@@ -5,12 +5,11 @@ const getLobbies = async (req, res) => {
     res.send(lobbies);
 
 }
-
+   
 //TODO schema validation
 const startGame = async (req, res) => {
     const gameParams = req.body;
-    console.log(gameParams)
-    //{ size: '20', difficulty: 'easy', timeBet: 'time_0' }
+
     if (gameParams.mode === 'single') {
         const field = gameModel.generateField(gameParams.size, gameParams.difficulty);
         const game = await gameModel.createGame(req,gameParams,field);
@@ -29,11 +28,11 @@ const getGame = async (req, res) => {
 //TODO schema validation
 const createLobby = async (req, res) => {
     const gameParams = req.body;
-    console.log(gameParams)
+
     //TODO check if user is in game or lobby
 
     const check = await gameModel.check(req,gameParams.betType,gameParams.bet)
-    console.log(check)
+
     if (check) {
         return res.status(400).send({message: check});
     }
@@ -57,7 +56,7 @@ const joinLobby = async (req, res) => {
         return res.status(400).send({message: "Вы не можете присоединиться к своей игре"});
     }
     const check = await gameModel.check(req,game.reward.bombs > 0 ? "balance" : "rating",game.reward.bombs > 0 ? game.reward.bombs : game.reward.stars)
-    console.log(check)
+
     if (check) {
         return res.status(400).send({message: check});
     }
@@ -72,7 +71,6 @@ const deleteLobby = async (req, res) => {
     if (!gameModel.checkCreator(req,username)) {
         return res.status(403).send({message: "Вы не можете удалить эту игру"});
     }
-    console.log(username)
     const refundBet = await gameModel.deleteGame(req,username);
     res.send({message: "Вы вышли из лобби", refundBet});
 }

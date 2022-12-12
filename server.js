@@ -12,6 +12,7 @@ const start = async () => {
     try {
         const app = Fastify({
             logger:false,
+            exitOnError: false
             // forceCloseConnections: true,
         });
         app.register(require('@fastify/multipart'), {
@@ -61,7 +62,7 @@ const start = async () => {
             } catch (err) {
                 console.log(err)
                 reply.send(err)
-            }
+            }                  
         })
 
         app.addHook('onRequest', (req, res, next) => {

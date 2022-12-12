@@ -5,9 +5,11 @@ class MultiplayerSocketService {
     }
     
     addPlayer(uid, socket,username ,callback) {
+        console.log(`addPlayer ${uid} ${username}`)
         if (!this.lobbies[uid]) {
             this.lobbies[uid] = {
-                players: [] 
+                players: [],
+                start: true
             }
         }
         this.lobbies[uid].players.push({
@@ -15,8 +17,12 @@ class MultiplayerSocketService {
             socket: socket,
             callback: callback
         });
-        console.log(this.lobbies[uid].players)
-        if (this.lobbies[uid].players.length == 2) {
+        
+        if (!this.lobbies[uid].start) {
+            callback(this.lobbies[uid])
+        } else if (this.lobbies[uid].players.length == 2 && this.lobbies[uid].start) {
+            console.log("brodcast")
+            this.lobbies[uid].start = false;
             this.lobbies[uid].players.forEach(player => {
                 player.callback(this.lobbies[uid]);
             })
@@ -27,12 +33,18 @@ class MultiplayerSocketService {
         await this.lobbies[uid].players[0].socket.emit("message",JSON.stringify({type: "gameDeleted"}));
         delete this.lobbies[uid];
     }
-    removeUser(username) {
-        delete this.users[username];
+    removeUser(username,uid) {
+        if (!this.lobbies[uid]) return
+        this.lobbies[uid].players = this.lobbies[uid].players.filter(player => player.username != username);
     }
 
-    sendToUser(username, message) {
-        
+    sendToOpponent(uid,myName,message) {
+        if (!this.lobbies[uid]) return
+        this.lobbies[uid].players.forEach(player => {
+            if (player.username != myName) {
+                player.socket.send(JSON.stringify(message));
+            }
+        })
     }
 
     getUser(username) {
