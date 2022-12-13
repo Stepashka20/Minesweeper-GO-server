@@ -160,7 +160,7 @@ const createGameAndLobby = async (req,gameParams,field) => {
         field: field,
         creator: user.username,
         userFields: [
-            {
+            {     
                 username: user.username,
                 field:[...Array(field.length).keys()].map(i => -2)
             },

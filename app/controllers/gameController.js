@@ -51,7 +51,7 @@ const joinLobby = async (req, res) => {
     }
     if (game.players.length >= 2) {
         return res.status(400).send({message: "Лобби заполнено"}); 
-    }
+    }          
     if (game.players[0].username == username) {
         return res.status(400).send({message: "Вы не можете присоединиться к своей игре"});
     }

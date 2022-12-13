@@ -10,7 +10,11 @@ class NewConnection {
             this.username = req.jwt.decode(req.headers.authorization.split(' ')[1]).username;
             this.game = await this.games.findOne({uid:this.uid});
             this.user = await this.users.findOne({username:this.username,game: this.uid});
-            this.userField = this.game.userFields.find(userField => userField.username == this.username).field;
+            if (this.game.mode == "multiplayer") {
+                this.userField = this.game.userFields.find(userField => userField.username == this.username).field;
+            } else {
+                this.userField = this.game.userField;
+            }
             this.send = async (data) => this.socket.send(JSON.stringify(data))
             if (!this.user || !this.game)
                 throw new Error("Игра не найдена")
@@ -125,8 +129,9 @@ class NewConnection {
         this.game.players.find(player => player.username == this.username).points = sum;
         const finalPoints = sum
         this.send({type: 'open', data: {cellNum: cellNum, minesCount: minesCount,userField:this.userField,points:finalPoints}})
-        // this.lobby.players.find(x=>x.username != this.username).socket.send(JSON.stringify())
-        multiplayerSocketService().sendToOpponent(this.uid,this.username,{type:'opponent_points',data:{points:finalPoints}})
+        
+        if (this.game.mode == "multiplayer")
+            multiplayerSocketService().sendToOpponent(this.uid,this.username,{type:'opponent_points',data:{points:finalPoints}})
         this.checkWin()
     }
     flag(message){
@@ -160,15 +165,21 @@ class NewConnection {
         this.socket.close();
     }
     saveGame(){
-        this.games.updateOne({uid:this.uid},{$set:{
-            userFields: this.game.userFields.map(x=> {
-                //x.username == this.username ? {username: this.username,field: this.userField} : x.field
-                if (x.username == this.username) 
-                    return {username: this.username,field: this.userField}
-                return x
-            }),
-            players: this.game.players.map(x=> x.username == this.username ? this.game.players.find(player => player.username == this.username) : x)
-        }});
+        if (this.gameEnd) return
+        if (this.game.mode == "multiplayer") {
+            this.games.updateOne({uid:this.uid},{$set:{
+                userFields: this.game.userFields.map(x=> {
+                    //x.username == this.username ? {username: this.username,field: this.userField} : x.field
+                    if (x.username == this.username) 
+                        return {username: this.username,field: this.userField}
+                    return x
+                }),
+                players: this.game.players.map(x=> x.username == this.username ? this.game.players.find(player => player.username == this.username) : x)
+            }});
+        } else {
+
+        }
+
     }
     onClose() {
         console.log('Connection closed')
@@ -306,6 +317,10 @@ class NewConnection {
         await loser.soket.send(JSON.stringify({type:'lose'}))
         const winnerProfile = await this.users.findOne({username: winner.username});
         const loserProfile = await this.users.findOne({username: loser.username});
+        // set game for both to null
+        this.users.updateOne({username: winner.username},{$set:{game:null}})
+        this.users.updateOne({username: loser.username},{$set:{game:null}})
+
         await this.users.updateOne({username: winner.username},{
             $inc:{
                 balance:this.game.reward.bombs*2,
@@ -326,7 +341,7 @@ class NewConnection {
                     result: 1
                 }
             }
-
+ 
         });
         await this.users.updateOne({username:loser.username},{
             $inc:{
@@ -394,14 +409,14 @@ class NewConnection {
                             rating:this.game.reward.stars,
                         },
                         $set:{
-                            [`statistics.bestTime.${this.game.difficulty}`]: this.user.statistics.bestTime[this.game.difficulty] > gameTime && this.user.statistics.bestTime[this.game.difficulty] > 0 ? gameTime : this.user.statistics.bestTime[this.game.difficulty] 
+                            [`statistics.bestTime.${this.game.difficulty}`]: this.user.statistics.bestTime[this.game.difficulty] > gameTime || this.user.statistics.bestTime[this.game.difficulty] == 0 ? gameTime : this.user.statistics.bestTime[this.game.difficulty] 
                         }
                     });
                     this.send({type: 'win',data:{reward: true, bombs: this.game.reward.bombs, stars: this.game.reward.stars}})
                 } else { 
                     await this.users.updateOne({username:this.username},{
                         $set:{
-                            [`statistics.bestTime.${this.game.difficulty}`]: this.user.statistics.bestTime[this.game.difficulty] > gameTime && this.user.statistics.bestTime[this.game.difficulty] > 0 ? gameTime : this.user.statistics.bestTime[this.game.difficulty] 
+                            [`statistics.bestTime.${this.game.difficulty}`]: this.user.statistics.bestTime[this.game.difficulty] > gameTime || this.user.statistics.bestTime[this.game.difficulty] == 0 ? gameTime : this.user.statistics.bestTime[this.game.difficulty] 
                         }
                     });
                     this.send({type: 'win',data:{reward: false}})
