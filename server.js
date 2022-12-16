@@ -27,10 +27,8 @@ const start = async () => {
         });
         multiplayerSocketService.init();
         app.register(cors, {
-            origin: '*',
-            methods: ['GET', 'POST', 'PUT', 'DELETE'],
-            allowedHeaders: ['*'],
-            credentials: true,
+            origin: "https://minesweeper-go.ru",
+            methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
         });
         app.setErrorHandler(function (error, request, reply) {
             console.log(error)
@@ -48,7 +46,16 @@ const start = async () => {
             dir: path.join(__dirname,'./app/routes'),
             ignorePattern: /schemas$/
         })
-        app.register(fastify_graceful_shutdown)
+        process.on('uncaughtException', function(err) {
+            console.log('Caught exception: ' + err);
+          });
+          app.ready(err => {
+            if (err) {
+              console.log(err)
+              return;
+            }
+            console.log('MongoDB connection established');
+          });
         app.decorate("authenticate", async function(request, reply) {
             try {
                 if (request.query?.token) request.headers.authorization = `Bearer ${request.query.token}` //for websockets
@@ -72,17 +79,9 @@ const start = async () => {
             req.jwt = app.jwt;
             next()
         }) 
-        app.after(() => {
-            app.gracefulShutdown(async (signal, next) => {
-              console.log('Stopping server...')
-              await app.close()
-              await app.mongo.client.close()
-              await app.unref()
-              next()
-            })
-        })
-        app.listen({ port: process.env.SERVER_PORT },()=>{
-            // console.log(app.printRoutes());
+  
+        app.listen(process.env.SERVER_PORT,"0.0.0.0" ,()=>{
+            console.log("Server started")
         })
     } catch (err) {
         console.log(err)
