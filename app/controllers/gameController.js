@@ -6,7 +6,7 @@ const getLobbies = async (req, res) => {
 
 }
    
-//TODO schema validation
+
 const startGame = async (req, res) => {
     const gameParams = req.body;
 
@@ -25,11 +25,9 @@ const getGame = async (req, res) => {
     }
     res.send(game);
 }
-//TODO schema validation
+
 const createLobby = async (req, res) => {
     const gameParams = req.body;
-
-    //TODO check if user is in game or lobby
 
     const check = await gameModel.check(req,gameParams.betType,gameParams.bet)
 

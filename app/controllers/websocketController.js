@@ -62,7 +62,6 @@ class NewConnection {
     }  
     ping(message){
         this.send({type:'pong'})
-        // this.saveGame()
     }
     reconnect(message){
     }
@@ -70,13 +69,13 @@ class NewConnection {
         if (this.gameEnd) return
         const cellNum = message.data;
         var field = this.game.field;
+        if (this.userField[cellNum] == -3) return
         if (field[cellNum] == -1) {
             this.gameEnd = true;
             this.users.updateOne({username:this.username},{$set:{game:null}});
             for (let i = 0; i < field.length; i++) {
                 if (field[i] == -1) this.userField[i] = -1;
             }
-            // this.game.players.find(player => player.username == this.username).points = 0;
             this.send({type: 'gameover',data:{cellNum:cellNum,userField: this.userField}})
             if (this.game.mode == "multiplayer") {
                 await this.defeat();
@@ -237,7 +236,6 @@ class NewConnection {
         const gameTime = (Date.now() - this.game.timeStart)
         console.log(myPoints,opponent.points)
         if (opponent.status == "defeat"){
-            //TODO refactor this
             if (myPoints > opponent.points){
                 let winner = {
                     username: this.username,
@@ -317,7 +315,7 @@ class NewConnection {
         await loser.soket.send(JSON.stringify({type:'lose'}))
         const winnerProfile = await this.users.findOne({username: winner.username});
         const loserProfile = await this.users.findOne({username: loser.username});
-        // set game for both to null
+
         this.users.updateOne({username: winner.username},{$set:{game:null}})
         this.users.updateOne({username: loser.username},{$set:{game:null}})
 
@@ -335,7 +333,7 @@ class NewConnection {
                 gameHistory: {
                     avatarUrl: loserProfile.avatar,
                     name: loserProfile.username,
-                    difficulty: {"easy":0, "meduim":1, "hard": 2}[this.game.difficulty],
+                    difficulty: {"easy":0, "medium":1, "hard": 2}[this.game.difficulty],
                     betValue: this.game.reward.bombs > 0 ? this.game.reward.bombs : this.game.reward.stars,
                     betType: this.game.reward.bombs > 0 ? 0 : 1,
                     result: 1

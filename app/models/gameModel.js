@@ -56,8 +56,7 @@ const getGame = async (req,uid) => {
         userResp.userFields = userResp.userFields.filter(f => f.username == username)
     }
     delete userResp.field;
-   
-    // console.log(userResp)
+
     return userResp;
 }
 
@@ -233,7 +232,6 @@ const joinGame = async (req,uid) => {
     const games = req.mongo.collection('games');
     const game = await games.findOne({uid:uid});
 
-    //set game playing, set start time, add user to players, set usernmae to userFields[1].username
     await games.updateOne({uid:uid},
         {$set:{
             status: "playing",
